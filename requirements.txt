@@ -1,0 +1,8 @@
+
+Flask
+mysql-connector-python==8.0.28
+pyJWT==2.3.0
+Werkzeug<2.0.0
+MarkupSafe<2.0.0
+bcrypt
+
