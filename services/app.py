@@ -48,26 +48,32 @@ def convert_decimal(obj):
 def index():
     return jsonify({'message': 'Welcome to School Management System Application!!'})
 
-@app.route('/home', methods=['GET'])
+@app.route('/admin/home', methods=['GET'])
 def home():
-    return jsonify({'message': 'Welcome to Home Page!', 'links': {'admin_dashboard': '/admin_dashboard'}})
+    return jsonify({'message': 'Welcome to Home Page!', 'links': {'admin_dashboard': '/admin/dashboard'}})
 
 
 @app.route('/admin/login', methods=['POST'])
 def admin_login():
-    if request.method == 'POST':
-        username = request.json.get('username')
-        password = request.json.get('password')
-        if not username or not password:
-            return jsonify({'message': 'Username and password are required'}), 400
-        if username == 'admin' and password == 'admin_password':
-            session['admin_logged_in'] = True
-            return jsonify({'message': 'Login successful'}), 200
-        else:
-            return jsonify({'message': 'Invalid credentials'}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'Bad Request: No data provided'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'message': 'Username and password are required'}), 400
+
+    if username == 'admin' and password == 'admin':
+        session['admin_logged_in'] = True
+        return jsonify({'message': 'Login successful'}), 200
+    else:
+        return jsonify({'message': 'Invalid credentials'}), 401
 
 
-@app.route('/admin_dashboard', methods=['GET'])
+
+@app.route('/admin/dashboard', methods=['GET'])
 def admin_dashboard():
     admin_dashboard_links = {
         'staff': '/admin/staff_data',
@@ -75,11 +81,14 @@ def admin_dashboard():
         'about_us': '/admin/about_us',
         'contact_us': '/admin/contact_us',
         'reviews': '/admin/reviews',
-        'query': '/admin/query'
+        'query': '/admin/query', 
+        'enquiries': '/admin/enquiries',
+        'attendance': '/attendances',
+        'filter_by_section': '/attendances/section/<section_name>',
+        'filter_by_date': '/attendances/date/<YYYY-MM-DD>'
     }
 
     return jsonify({'message': 'Welcome to Admin Dashboard!', 'links': admin_dashboard_links})
-
 @app.route('/admin/staff_data', methods=['GET'])
 def admin_staff_data():
     try:
@@ -103,6 +112,76 @@ def admin_about_us():
     about_us_info = "About Us: This webpage provides information about our services and team. Our school, XYZ School, is committed to providing quality education to students. Our dedicated team of educators and staff ensures a nurturing environment for learning and growth. The school management oversees the smooth functioning of academic and extracurricular activities, aiming to foster holistic development among students."
     return jsonify({'message': about_us_info})
 
+
+@app.route('/attendances', methods=['GET'])
+def get_attendances():
+    try:
+        cursor.execute("SELECT * FROM students_attendance")
+        records = cursor.fetchall()
+        attendance_records = []
+        for record in records:
+            attendance_record = {
+                'id': record[0],
+                'student_id': record[1],
+                'date': record[2].strftime('%Y-%m-%d'),
+                'section': record[3],
+                'status': record[4]
+            }
+            attendance_records.append(attendance_record)
+        return jsonify({'attendance_records': attendance_records})
+    except mysql.connector.Error as err:
+        return jsonify({'message': f"Error fetching attendance records: {err}"}), 500
+
+
+@app.route('/attendances/section/<string:section>', methods=['GET'])
+def get_attendance_by_section(section):
+    try:
+        cursor.execute("SELECT * FROM students_attendance WHERE section=%s", (section,))
+        records = cursor.fetchall()
+        attendance_records = []
+        for record in records:
+            attendance_record = {
+                'id': record[0],
+                'student_id': record[1],
+                'date': record[2].strftime('%Y-%m-%d'),
+                'section': record[3],
+                'status': record[4]
+            }
+            attendance_records.append(attendance_record)
+        return jsonify({'attendance_records': attendance_records})
+    except mysql.connector.Error as err:
+        return jsonify({'message': f"Error fetching attendance records: {err}"}), 500
+
+
+@app.route('/attendances/date/<string:date>', methods=['GET'])
+def get_attendance_by_date(date):
+    try:
+        datetime.strptime(date, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'message': 'Invalid date format. Use YYYY-MM-DD.'}), 400
+
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM students_attendance WHERE date=%s", (date,))
+        records = cursor.fetchall()
+        cursor.close()
+
+        attendance_records = []
+        for record in records:
+            attendance_record = {
+                'id': record[0],
+                'student_id': record[1],
+                'date': record[2].strftime('%Y-%m-%d'),
+                'section': record[3],
+                'status': record[4]
+            }
+            attendance_records.append(attendance_record)
+        return jsonify({'attendance_records': attendance_records})
+    except mysql.connector.Error as err:
+        return jsonify({'message': f"Error fetching attendance records: {err}"}), 500
+
+
+
 @app.route('/admin/contact_us', methods=['GET'])
 def admin_contact_us():
     contact_info = {
@@ -118,35 +197,66 @@ def admin_contact_us():
     return jsonify({'message': 'Contact Us:', 'contact_info': contact_info})
 
 @app.route('/admin/reviews', methods=['GET'])
-def reviews():
-    reviews_info = [
-        {
-            'author': 'Parent 1',
-            'content': 'The school provides a nurturing environment for students.'
-        },
-        {
-            'author': 'Student 1',
-            'content': 'The teachers are supportive and encourage active learning.'
-        },
-        {
-            'author': 'Alumni 1',
-            'content': 'Attending this school was a great experience that prepared me well for the future.'
-        },
-        {
-            'author': 'Parent 2',
-            'content': 'The extracurricular activities offered are diverse and enriching.'
-        },
-        {
-            'author': 'Student 2',
-            'content': 'The school fosters a sense of community and belonging among students.'
-        }
-    ]
-    return jsonify({'reviews': reviews_info})
+def admin_reviews():
+    try:
+        cursor.execute("SELECT id, parent_id, institution_id, review_text, rating, created_at FROM reviewsratings")
+        reviews = cursor.fetchall()
+        reviews_data = []
+        for review in reviews:
+            review_info = {
+                'id': review[0],
+                'parent_id': review[1],
+                'institution_id': review[2],
+                'review_text': review[3],
+                'rating': review[4],
+                'created_at': review[5].strftime('%Y-%m-%d %H:%M:%S')
+            }
+            reviews_data.append(review_info)
+        return jsonify({'reviews': reviews_data})
+    except mysql.connector.Error as err:
+        return jsonify({'message': f"Error fetching reviews: {err}"}), 500
+
 
 @app.route('/admin/query', methods=['GET'])
 def admin_query():
-    query_info = "Query: Have a question? Feel free to ask us anything!"
-    return jsonify({'message': query_info})
+    try:
+        cursor.execute("SELECT id, student_id, query_text, answer_text FROM query")
+        queries = cursor.fetchall()
+        queries_data = []
+        for query in queries:
+            query_info = {
+                'id': query[0],
+                'student_id': query[1],
+                'query_text': query[2],
+                'answer_text': query[3]
+            }
+            queries_data.append(query_info)
+        return jsonify({'queries': queries_data})
+    except mysql.connector.Error as err:
+        return jsonify({'message': f"Error fetching queries: {err}"}), 500
+
+
+@app.route('/admin/enquiries', methods=['GET'])
+def admin_enquiries():
+    try:
+        cursor.execute("SELECT id, parent_name, email, phone, institution_id, institution_category, message FROM parentenquiries")
+        enquiries = cursor.fetchall()
+        enquiries_data = []
+        for enquiry in enquiries:
+            enquiry_info = {
+                'id': enquiry[0],
+                'parent_name': enquiry[1],
+                'email': enquiry[2],
+                'phone': enquiry[3],
+                'institution_id': enquiry[4],
+                'institution_category': enquiry[5],
+                'message': enquiry[6]
+            }
+            enquiries_data.append(enquiry_info)
+        return jsonify({'enquiries': enquiries_data})
+    except mysql.connector.Error as err:
+        return jsonify({'message': f"Error fetching enquiries: {err}"}), 500
+
 
 
 
@@ -371,31 +481,26 @@ def delete_attendance_record(id):
 @app.route('/students/reviews', methods=['GET'])
 def students_reviews():
     if 'user_id' in session:  
-        reviews_info = [
-            {
-                'author': 'Parent 1',
-                'content': 'The school provides a nurturing environment for students.'
-            },
-            {
-                'author': 'Student 1',
-                'content': 'The teachers are supportive and encourage active learning.'
-            },
-            {
-                'author': 'Alumni 1',
-                'content': 'Attending this school was a great experience that prepared me well for the future.'
-            },
-            {
-                'author': 'Parent 2',
-                'content': 'The extracurricular activities offered are diverse and enriching.'
-            },
-            {
-                'author': 'Student 2',
-                'content': 'The school fosters a sense of community and belonging among students.'
-            }
-        ]
-        return jsonify({'reviews': reviews_info})
+        try:
+            cursor.execute("SELECT id, parent_id, institution_id, review_text, rating, created_at FROM reviewsratings")
+            reviews = cursor.fetchall()
+            reviews_info = []
+            for review in reviews:
+                review_info = {
+                    'id': review[0],
+                    'parent_id': review[1],
+                    'institution_id': review[2],
+                    'review_text': review[3],
+                    'rating': review[4],
+                    'created_at': review[5].strftime('%Y-%m-%d %H:%M:%S')
+                }
+                reviews_info.append(review_info)
+            return jsonify({'reviews': reviews_info})
+        except mysql.connector.Error as err:
+            return jsonify({'message': f"Error fetching reviews: {err}"}), 500
     else:
         return jsonify({'message': 'Login required to access this page!'}), 401
+
 
 @app.route('/students/query', methods=['POST'])
 def create_query():
@@ -678,32 +783,27 @@ def staff_contact_us():
 
 @app.route('/staff/reviews', methods=['GET'])
 def staff_reviews():
-    if 'user_id' in session:  
-        reviews_info = [
-            {
-                'author': 'Parent 1',
-                'content': 'The school provides a nurturing environment for students.'
-            },
-            {
-                'author': 'Student 1',
-                'content': 'The teachers are supportive and encourage active learning.'
-            },
-            {
-                'author': 'Alumni 1',
-                'content': 'Attending this school was a great experience that prepared me well for the future.'
-            },
-            {
-                'author': 'Parent 2',
-                'content': 'The extracurricular activities offered are diverse and enriching.'
-            },
-            {
-                'author': 'Student 2',
-                'content': 'The school fosters a sense of community and belonging among students.'
-            }
-        ]
-        return jsonify({'reviews': reviews_info})
+    if 'staff_id' in session:
+        try:
+            cursor.execute("SELECT id, parent_id, institution_id, review_text, rating, created_at FROM reviewsratings")
+            reviews = cursor.fetchall()
+            reviews_info = []
+            for review in reviews:
+                review_info = {
+                    'id': review[0],
+                    'parent_id': review[1],
+                    'institution_id': review[2],
+                    'review_text': review[3],
+                    'rating': review[4],
+                    'created_at': review[5].strftime('%Y-%m-%d %H:%M:%S')
+                }
+                reviews_info.append(review_info)
+            return jsonify({'reviews': reviews_info})
+        except mysql.connector.Error as err:
+            return jsonify({'message': f"Error fetching reviews: {err}"}), 500
     else:
         return jsonify({'message': 'Login required to access this page!'}), 401
+
     
     
 
@@ -736,8 +836,6 @@ def answer_query(id):
         return jsonify({'message': 'Query answered successfully!'})
     else:
         return jsonify({'message': 'Login required to answer queries!'}), 401
-
-
 
 
 
@@ -817,6 +915,7 @@ def parent_forgot_password():
 
     return jsonify({'message': 'Password reset successfully!'})
 
+
 @app.route('/parents/logout', methods=['POST'])
 def parent_logout():
     if 'parent_id' in session:
@@ -824,6 +923,7 @@ def parent_logout():
         return jsonify({'message': 'Logout successful!'})
     else:
         return jsonify({'message': 'No parent is currently logged in!'}), 401
+
 
 @app.route('/parents/dashboard', methods=['GET'])
 def parent_dashboard():
@@ -1022,6 +1122,94 @@ def parents_contact_us():
         return jsonify({'message': 'Login required to access this page!'}), 401
 
 
+@app.route('/parents/dashboard/awards_certifications', methods=['GET'])
+def get_awards_certifications():
+    if 'parent_id' not in session:
+        return jsonify({'message': 'Login required to access this page!'}), 401
+
+    try:
+        if not db.is_connected():
+            db.reconnect(attempts=1, delay=0)
+
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM AwardsCertifications")
+        awards_certifications = cursor.fetchall()
+        cursor.close()
+
+        for award in awards_certifications:
+            for key, value in award.items():
+                if isinstance(value, Decimal):
+                    award[key] = float(value)
+
+        response = {
+            'message': 'List of Awards and Certifications',
+            'awards_certifications': awards_certifications
+        }
+    except mysql.connector.Error as err:
+        return jsonify({'message': f'Error: {err}'}), 500
+
+    return jsonify(response)
+
+@app.route('/parents/dashboard/reviews_ratings', methods=['GET'])
+def get_reviews_ratings():
+    if 'parent_id' not in session:
+        return jsonify({'message': 'Login required to access this page!'}), 401
+
+    try:
+        if not db.is_connected():
+            db.reconnect(attempts=1, delay=0)
+
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM ReviewsRatings")
+        reviews_ratings = cursor.fetchall()
+        cursor.close()
+
+        for review in reviews_ratings:
+            for key, value in review.items():
+                if isinstance(value, Decimal):
+                    review[key] = float(value)
+
+        response = {
+            'message': 'List of Reviews and Ratings',
+            'reviews_ratings': reviews_ratings,
+            'enquiry_form_link': '/parents/dashboard/support'
+        }
+    except mysql.connector.Error as err:
+        return jsonify({'message': f'Error: {err}'}), 500
+
+    return jsonify(response)
+
+
+@app.route('/parents/dashboard/reviews_ratings', methods=['POST'])
+def add_review_rating():
+    if 'parent_id' not in session:
+        return jsonify({'message': 'Login required to access this page!'}), 401
+
+    data = request.get_json()
+
+    parent_id = session['parent_id']
+    institution_id = data.get('institution_id')
+    review_text = data.get('review_text')
+    rating = data.get('rating')
+
+    if not all([institution_id, review_text, rating]):
+        return jsonify({'message': 'All fields are required!'}), 400
+
+    try:
+        if not db.is_connected():
+            db.reconnect(attempts=1, delay=0)
+
+        cursor = db.cursor()
+        cursor.execute("""
+            INSERT INTO ReviewsRatings (parent_id, institution_id, review_text, rating)
+            VALUES (%s, %s, %s, %s)
+        """, (parent_id, institution_id, review_text, rating))
+        db.commit()
+        cursor.close()
+    except mysql.connector.Error as err:
+        return jsonify({'message': f'Error: {err}'}), 500
+
+    return jsonify({'message': 'Review and rating submitted successfully!'})
 
 
 
