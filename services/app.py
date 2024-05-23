@@ -7,10 +7,10 @@ from decimal import Decimal
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_secret_key')
 
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
+app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'Aaryan.mysql.pythonanywhere.services.com')
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'Aaryah147')
 app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', 'harshrajput147')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'school_db')
+app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'Aaryan147$default')
 
 try:
     db = mysql.connector.connect(
