@@ -8,7 +8,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_secret_key')
 
 app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'Aaryan147.mysql.pythonanywhere-services.com')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'Aaryah147')
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'Aaryan147')
 app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', 'harshrajput147')
 app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'Aaryan147$default')
 
